@@ -1,0 +1,12 @@
+pip~=23.2.1
+attrs~=25.3.0
+pillow~=11.2.1
+tornado~=6.5.1
+Jinja2~=3.1.6
+numpy~=2.3.0
+pyvista~=0.45.2
+requests~=2.32.4
+skyfield~=1.53
+scipy~=1.15.3
+beautifulsoup4~=4.13.4
+playwright~=1.52.0
