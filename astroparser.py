@@ -11,7 +11,7 @@ import asyncio
 from playwright.async_api import async_playwright
 
 
-# --- ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ КООРДИНАТ ЧЕРЕЗ SELENIUM/PLAYWRIGHT ---
+# --- ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ КООРДИНАТ ЧЕРЕЗ PLAYWRIGHT
 async def get_coordinates_with_playwright(url_target='https://r4uab.ru/satdb/cubesx-sirius-hse/'):
     """
     Извлекает широту, долготу и высоту со страницы с помощью Playwright,
