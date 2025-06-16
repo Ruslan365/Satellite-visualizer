@@ -42,7 +42,6 @@ async def get_coordinates_with_playwright(url_target='https://r4uab.ru/satdb/cub
                     await frame.wait_for_selector('#data_panel', state='visible', timeout=20000)
                     print("Playwright: #data_panel найдена в iframe.")
 
-                    # Извлекаем текст, как и раньше
                     raw_latitude_text = await frame.inner_text('.latitude')
                     raw_longitude_text = await frame.inner_text('.longitude')
                     raw_altitude_text = await frame.inner_text('.altitude')
@@ -50,37 +49,23 @@ async def get_coordinates_with_playwright(url_target='https://r4uab.ru/satdb/cub
                     print(
                         f"Playwright: Сырые данные: Lat='{raw_latitude_text}', Lon='{raw_longitude_text}', Alt='{raw_altitude_text}'")
 
-                    # ---- ИСПРАВЛЕНИЕ ПАРСИНГА ----
-                    # Удаляем префиксы "Lat: ", "Lng: ", "Alt: "
                     latitude_text = raw_latitude_text.replace("Lat:", "").strip()
                     longitude_text = raw_longitude_text.replace("Lng:", "").strip()
                     altitude_text = raw_altitude_text.replace("Alt:", "").strip()
 
-                    # Парсинг широты (пример: "26° 22.63′ S")
                     match_lat = re.search(r"(\d+)°\s*([\d.]+)[′']\s*([NS])", latitude_text)  # Добавил ' для апострофа
                     if match_lat:
                         deg, minute, direction = match_lat.groups()
                         lat_val = float(deg) + float(minute) / 60.0
                         if direction == 'S': lat_val *= -1
 
-                    # Парсинг долготы (пример: "4° 16.06′ E")
-                    match_lon = re.search(r"(\d+)°\s*([\d.]+)[′']\s*([EW])", longitude_text)  # Добавил ' для апострофа
+                    match_lon = re.search(r"(\d+)°\s*([\d.]+)[′']\s*([EW])", longitude_text)  #' для апострофа
                     if match_lon:
                         deg, minute, direction = match_lon.groups()
                         lon_val = float(deg) + float(minute) / 60.0
                         if direction == 'W':
-                            # Для Skyfield, долгота > 180 E или отрицательная W.
-                            # Если сайт всегда дает положительные градусы с E/W,
-                            # то для W нужно сделать отрицательным.
                             lon_val *= -1
-                            # Однако, если сайт дает, например, 350 E, то это -10 W.
-                            # Текущий код с r4uab (349 E) оставлял как есть, т.к. Skyfield это понимает.
-                            # Если тут будет W, то lon_val *= -1 правильно.
-                            # Если E и > 180, Skyfield тоже справится.
-                            # Для примера "4° 16.06′ E" ничего делать не надо.
-                            # Если бы было "10° W", то стало бы -10.
 
-                    # Парсинг высоты (пример: "297.746 км")
                     match_alt = re.search(r"([\d.]+)\s*км", altitude_text)
                     if match_alt:
                         alt_val = float(match_alt.group(1))
@@ -233,9 +218,9 @@ def parse_current_value(current_str, default_val_amps=0.001):  # Переиме�
 I_sb_current = {1: parse_current_value(electricity1, 0.001), 2: parse_current_value(electricity2, 0.001),
                 3: parse_current_value(electricity3, 0.001)}
 print(f"Используемые токи СБ (А): {I_sb_current}")
-I_max_panel = {1: 0.15, 2: 0.15, 3: 0.15}  # ЗАПОЛНИТЕ!
+I_max_panel = {1: 0.15, 2: 0.15, 3: 0.15}
 print(f"Используемые I_max СБ (А): {I_max_panel}")
-satellite_dimensions = np.array([0.1, 0.1, 0.2])  # ЗАПОЛНИТЕ!
+satellite_dimensions = np.array([0.1, 0.1, 0.2])
 NADIR_POINTING_AXIS_BODY = np.array([0.0, 0.0, 1.0])
 print(f"Предположение для надирного наведения: ось {NADIR_POINTING_AXIS_BODY} в СК КА направлена на надир.")
 default_n_panel_body_for_calc = {
@@ -322,13 +307,12 @@ nadir_global = get_nadir_vector_global(satellite_sky_obj,
 nadir_body_assumed = NADIR_POINTING_AXIS_BODY / np.linalg.norm(NADIR_POINTING_AXIS_BODY)
 
 print("\n--- Поиск наилучшей гипотезы расположения солнечных панелей ---")
-# (код перебора гипотез остается здесь)
 possible_normals_map = {
     "+X": np.array([1.0, 0.0, 0.0]), "-X": np.array([-1.0, 0.0, 0.0]),
     "+Y": np.array([0.0, 1.0, 0.0]), "-Y": np.array([0.0, -1.0, 0.0]),
     "+Z": np.array([0.0, 0.0, 1.0]), "-Z": np.array([0.0, 0.0, -1.0])}
 face_names_ordered = list(possible_normals_map.keys())
-panel_ids_ordered = sorted(list(I_sb_current.keys()))  # Должно быть [1, 2, 3] в этой версии
+panel_ids_ordered = sorted(list(I_sb_current.keys()))
 best_hypothesis_info = None;
 max_consistency_score = -2.0;
 num_hypotheses = 0
@@ -344,10 +328,10 @@ if len(panel_ids_ordered) > 0 and len(face_names_ordered) >= len(panel_ids_order
         hypothesis_name_str = "; ".join(hypothesis_desc_list)
         try:
             s_sun_body_hyp = solve_sun_vector_body(I_sb_current, I_max_panel,
-                                                   current_n_panel_body_for_calc_hyp)  # Используем старую solve_sun_vector_body, т.к. I_sb_current это токи
+                                                   current_n_panel_body_for_calc_hyp)
             if np.linalg.norm(s_sun_body_hyp) < 1e-6: continue
             attitude_matrix_hyp = calculate_attitude_triad(s_sun_body_hyp, nadir_body_assumed, s_sun_global,
-                                                           nadir_global)  # Все еще используем надир
+                                                           nadir_global)
             s_sun_global_transformed_to_body = attitude_matrix_hyp.T @ s_sun_global
             if np.linalg.norm(s_sun_global_transformed_to_body) > 1e-6:
                 s_sun_global_transformed_to_body /= np.linalg.norm(s_sun_global_transformed_to_body)
@@ -377,7 +361,7 @@ if best_hypothesis_info:
 else:
     print("\nПРЕДУПРЕЖДЕНИЕ: Не найдена лучшая гипотеза. Используется конфигурация по умолчанию.")
     s_sun_body = solve_sun_vector_body(I_sb_current, I_max_panel,
-                                       n_panel_body_for_calc_final)  # Используем старую solve_sun_vector_body
+                                       n_panel_body_for_calc_final)
     try:
         attitude_matrix = calculate_attitude_triad(s_sun_body, nadir_body_assumed, s_sun_global, nadir_global)
     except ValueError as e:
@@ -386,9 +370,9 @@ else:
 print(f"\n--- Финальные параметры ориентации ---")
 print(f"Позиция КА в GCRS [км]: {sat_pos_gcrs_km}")
 print(f"Вектор на Солнце в глоб. СК (от КА): {s_sun_global}")
-print(f"Вектор на надир в глоб. СК (от КА): {nadir_global}")  # Оставляем для информации
+print(f"Вектор на надир в глоб. СК (от КА): {nadir_global}")
 print(f"Вектор на Солнце в СК КА: {s_sun_body}")
-print(f"Вектор на надир в СК КА (предположение): {nadir_body_assumed}")  # Оставляем для информации
+print(f"Вектор на надир в СК КА (предположение): {nadir_body_assumed}")
 print(f"Матрица ориентации (body-to-global):\n{attitude_matrix}")
 if not np.allclose(np.dot(attitude_matrix, attitude_matrix.T), np.identity(3)): print(
     "ПРЕДУПРЕЖДЕНИЕ: Матрица не ортонормирована!")
@@ -400,7 +384,7 @@ print(f"Ориентация (кватернион XYZW, body-to-global): {orien
 print(
     f"Ориентация (углы Эйлера 'xyz', body-to-global) [градусы]: Roll={orientation_euler_xyz_deg[0]:.2f}°, Pitch={orientation_euler_xyz_deg[1]:.2f}°, Yaw={orientation_euler_xyz_deg[2]:.2f}°")
 
-print("\n--- Углы к Солнцу и Надиру в СК КА ---")  # Надир здесь все еще по предположению
+print("\n--- Углы к Солнцу и Надиру в СК КА ---")
 if np.linalg.norm(s_sun_body) > 1e-6:
     az_sun_body = np.degrees(np.arctan2(s_sun_body[1], s_sun_body[0]))
     el_sun_body = np.degrees(np.arcsin(np.clip(s_sun_body[2], -1, 1)))
