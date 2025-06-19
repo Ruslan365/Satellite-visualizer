@@ -11,24 +11,21 @@ import asyncio
 from playwright.async_api import async_playwright
 
 
-# --- ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ КООРДИНАТ ЧЕРЕЗ PLAYWRIGHT
+# --- ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ КООРДИНАТ ЧЕРЕЗ SELENIUM/PLAYWRIGHT ---
 async def get_coordinates_with_playwright(url_target='https://r4uab.ru/satdb/cubesx-sirius-hse/'):
-    """
-    Извлекает широту, долготу и высоту со страницы с помощью Playwright,
-    работая с iframe.
-    """
+
     print("Playwright: Запуск для получения координат...")
     lat_val, lon_val, alt_val = None, None, None
     try:
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)  # или headless=False для отладки
             page = await browser.new_page()
-            await page.goto(url_target, timeout=30000)
+            await page.goto(url_target, timeout=10000)
 
             iframe_selector = 'iframe[src="https://r4uab.ru/content/modules/sattrack/?catalog_number=47951"]'
             print(f"Playwright: Ожидание iframe с селектором: {iframe_selector}")
             try:
-                await page.wait_for_selector(iframe_selector, state='visible', timeout=20000)
+                await page.wait_for_selector(iframe_selector, state='visible', timeout=10000)
                 iframe_element = await page.query_selector(iframe_selector)
             except Exception as e_iframe_wait:
                 print(f"Playwright: Ошибка ожидания iframe: {e_iframe_wait}")
@@ -48,7 +45,6 @@ async def get_coordinates_with_playwright(url_target='https://r4uab.ru/satdb/cub
 
                     print(
                         f"Playwright: Сырые данные: Lat='{raw_latitude_text}', Lon='{raw_longitude_text}', Alt='{raw_altitude_text}'")
-
                     latitude_text = raw_latitude_text.replace("Lat:", "").strip()
                     longitude_text = raw_longitude_text.replace("Lng:", "").strip()
                     altitude_text = raw_altitude_text.replace("Alt:", "").strip()
@@ -59,13 +55,12 @@ async def get_coordinates_with_playwright(url_target='https://r4uab.ru/satdb/cub
                         lat_val = float(deg) + float(minute) / 60.0
                         if direction == 'S': lat_val *= -1
 
-                    match_lon = re.search(r"(\d+)°\s*([\d.]+)[′']\s*([EW])", longitude_text)  #' для апострофа
+                    match_lon = re.search(r"(\d+)°\s*([\d.]+)[′']\s*([EW])", longitude_text)  # Добавил ' для апострофа
                     if match_lon:
                         deg, minute, direction = match_lon.groups()
                         lon_val = float(deg) + float(minute) / 60.0
                         if direction == 'W':
                             lon_val *= -1
-
                     match_alt = re.search(r"([\d.]+)\s*км", altitude_text)
                     if match_alt:
                         alt_val = float(match_alt.group(1))
@@ -93,10 +88,10 @@ print("Запрос данных телеметрии с сайта r4uab.ru..."
 url_telemetry = "https://r4uab.ru/satdb/cubesx-sirius-hse/"  # Отдельный URL для телеметрии
 headers_bs4 = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"}
-Time_value = None;
-Date_TLM = None;
-electricity1 = None;
-electricity2 = None;
+Time_value = None
+Date_TLM = None
+electricity1 = None
+electricity2 = None
 electricity3 = None
 try:
     response_bs4 = requests.get(url_telemetry, headers=headers_bs4, timeout=15)
@@ -133,8 +128,8 @@ except Exception as e:
 # --- 0. КОНСТАНТЫ И ПРЕДПОЛОЖЕНИЯ ---
 ts = load.timescale()
 print("Загрузка эфемерид Skyfield...")
-eph = load('de421.bsp');
-earth = eph['earth'];
+eph = load('de421.bsp')
+earth = eph['earth']
 sun = eph['sun']
 print("Эфемериды загружены.")
 time_utc = None
@@ -158,7 +153,7 @@ if time_utc is None:  # Если BS4 не дал времени, использ�
 # --- ПОЛУЧЕНИЕ КООРДИНАТ КА ЧЕРЕЗ PLAYWRIGHT ---
 print("\n--- Автоматическое получение координат КА с r4uab.ru (через iframe)... ---")
 # Запускаем асинхронную функцию Playwright
-loop = asyncio.get_event_loop()
+loop = asyncio.new_event_loop()
 if loop.is_closed():  # Для сред, где цикл может быть закрыт (например, Jupyter notebook после перезапуска ядра)
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -191,14 +186,13 @@ else:
             except ValueError:
                 print("Ошибка: Введите корректное число.")
 
-
     sat_lat_deg = get_float_input("Широта (градусы, южная - отрицательная)", "-44.674")
     sat_lon_deg = get_float_input("Долгота (градусы, восточная)", "349.343")
     sat_alt_km = get_float_input("Высота (км)", "312.662")
 
 def parse_current_value(current_str, default_val_amps=0.001):  # Переименовал для ясности
     if current_str is None: return default_val_amps
-    current_str = current_str.strip().lower();
+    current_str = current_str.strip().lower()
     val = 0.0
     try:
         match = re.search(r"([-+]?\d*\.?\d+|\d+\.?\d*)", current_str)
@@ -218,9 +212,9 @@ def parse_current_value(current_str, default_val_amps=0.001):  # Переиме�
 I_sb_current = {1: parse_current_value(electricity1, 0.001), 2: parse_current_value(electricity2, 0.001),
                 3: parse_current_value(electricity3, 0.001)}
 print(f"Используемые токи СБ (А): {I_sb_current}")
-I_max_panel = {1: 0.15, 2: 0.15, 3: 0.15}
+I_max_panel = {1: 0.15, 2: 0.15, 3: 0.15}  # ЗАПОЛНИТЕ!
 print(f"Используемые I_max СБ (А): {I_max_panel}")
-satellite_dimensions = np.array([0.1, 0.1, 0.2])
+satellite_dimensions = np.array([0.1, 0.1, 0.2])  # ЗАПОЛНИТЕ!
 NADIR_POINTING_AXIS_BODY = np.array([0.0, 0.0, 1.0])
 print(f"Предположение для надирного наведения: ось {NADIR_POINTING_AXIS_BODY} в СК КА направлена на надир.")
 default_n_panel_body_for_calc = {
@@ -229,7 +223,6 @@ print(f"Используемые нормали панелей (конфигур
 
 satellite_sky_obj = earth + wgs84.latlon(latitude_degrees=sat_lat_deg, longitude_degrees=sat_lon_deg,
                                          elevation_m=sat_alt_km * 1000)
-
 
 # --- 2. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 def solve_sun_vector_body(I_sb_current_vals, I_max_panel_vals, n_panels_body_map_vals):
@@ -243,7 +236,7 @@ def solve_sun_vector_body(I_sb_current_vals, I_max_panel_vals, n_panels_body_map
             cos_alphas[panel_id] = cos_alpha
         else:
             cos_alphas[panel_id] = 0.0
-    s_sun_body_unnormalized = np.zeros(3);
+    s_sun_body_unnormalized = np.zeros(3)
     num_active_panels_for_sum = 0
     for panel_id, n_vec_panel in n_panels_body_map_vals.items():
         if panel_id in cos_alphas:
@@ -275,23 +268,23 @@ def calculate_attitude_triad(v1_body_vec, v2_body_vec, v1_global_vec, v2_global_
     for vec_name, vec in [("v1_body", v1_body_vec), ("v2_body", v2_body_vec), ("v1_global", v1_global_vec),
                           ("v2_global", v2_global_vec)]:
         if np.linalg.norm(vec) < 1e-9: raise ValueError(f"Вектор {vec_name} для TRIAD имеет нулевую длину: {vec}")
-    v1_b = v1_body_vec / np.linalg.norm(v1_body_vec);
+    v1_b = v1_body_vec / np.linalg.norm(v1_body_vec)
     v2_b = v2_body_vec / np.linalg.norm(v2_body_vec)
-    v1_g = v1_global_vec / np.linalg.norm(v1_global_vec);
+    v1_g = v1_global_vec / np.linalg.norm(v1_global_vec)
     v2_g = v2_global_vec / np.linalg.norm(v2_global_vec)
     if np.abs(np.dot(v1_b, v2_b)) > 0.999: raise ValueError("Векторы в СК КА (v1_body, v2_body) коллинеарны.")
     if np.abs(np.dot(v1_g, v2_g)) > 0.999: raise ValueError(
         "Векторы в глобальной СК (v1_global, v2_global) коллинеарны.")
-    t1_b = v1_b;
+    t1_b = v1_b
     t2_b_unnorm = np.cross(v1_b, v2_b)
     if np.linalg.norm(t2_b_unnorm) < 1e-9: raise ValueError("np.cross(v1_b, v2_b) дал нулевой вектор.")
-    t2_b = t2_b_unnorm / np.linalg.norm(t2_b_unnorm);
+    t2_b = t2_b_unnorm / np.linalg.norm(t2_b_unnorm)
     t3_b = np.cross(t1_b, t2_b)
     M_body = np.array([t1_b, t2_b, t3_b]).T
-    t1_g = v1_g;
+    t1_g = v1_g
     t2_g_unnorm = np.cross(v1_g, v2_g)
     if np.linalg.norm(t2_g_unnorm) < 1e-9: raise ValueError("np.cross(v1_g, v2_g) дал нулевой вектор.")
-    t2_g = t2_g_unnorm / np.linalg.norm(t2_g_unnorm);
+    t2_g = t2_g_unnorm / np.linalg.norm(t2_g_unnorm)
     t3_g = np.cross(t1_g, t2_g)
     M_global = np.array([t1_g, t2_g, t3_g]).T
     rotation_matrix = np.dot(M_global, M_body.T)
@@ -307,14 +300,15 @@ nadir_global = get_nadir_vector_global(satellite_sky_obj,
 nadir_body_assumed = NADIR_POINTING_AXIS_BODY / np.linalg.norm(NADIR_POINTING_AXIS_BODY)
 
 print("\n--- Поиск наилучшей гипотезы расположения солнечных панелей ---")
+# (код перебора гипотез остается здесь)
 possible_normals_map = {
     "+X": np.array([1.0, 0.0, 0.0]), "-X": np.array([-1.0, 0.0, 0.0]),
     "+Y": np.array([0.0, 1.0, 0.0]), "-Y": np.array([0.0, -1.0, 0.0]),
     "+Z": np.array([0.0, 0.0, 1.0]), "-Z": np.array([0.0, 0.0, -1.0])}
 face_names_ordered = list(possible_normals_map.keys())
-panel_ids_ordered = sorted(list(I_sb_current.keys()))
-best_hypothesis_info = None;
-max_consistency_score = -2.0;
+panel_ids_ordered = sorted(list(I_sb_current.keys()))  # Должно быть [1, 2, 3] в этой версии
+best_hypothesis_info = None
+max_consistency_score = -2.0
 num_hypotheses = 0
 if len(panel_ids_ordered) > 0 and len(face_names_ordered) >= len(panel_ids_ordered):
     for face_indices_for_panels in itertools.permutations(range(len(face_names_ordered)), len(panel_ids_ordered)):
@@ -328,10 +322,10 @@ if len(panel_ids_ordered) > 0 and len(face_names_ordered) >= len(panel_ids_order
         hypothesis_name_str = "; ".join(hypothesis_desc_list)
         try:
             s_sun_body_hyp = solve_sun_vector_body(I_sb_current, I_max_panel,
-                                                   current_n_panel_body_for_calc_hyp)
+                                                   current_n_panel_body_for_calc_hyp)  # Используем старую solve_sun_vector_body, т.к. I_sb_current это токи
             if np.linalg.norm(s_sun_body_hyp) < 1e-6: continue
             attitude_matrix_hyp = calculate_attitude_triad(s_sun_body_hyp, nadir_body_assumed, s_sun_global,
-                                                           nadir_global)
+                                                           nadir_global)  # Все еще используем надир
             s_sun_global_transformed_to_body = attitude_matrix_hyp.T @ s_sun_global
             if np.linalg.norm(s_sun_global_transformed_to_body) > 1e-6:
                 s_sun_global_transformed_to_body /= np.linalg.norm(s_sun_global_transformed_to_body)
@@ -349,19 +343,19 @@ if len(panel_ids_ordered) > 0 and len(face_names_ordered) >= len(panel_ids_order
             pass
 print(f"Проверено гипотез: {num_hypotheses}")
 
-attitude_matrix = np.identity(3);
+attitude_matrix = np.identity(3)
 s_sun_body = np.array([1.0, 0.0, 0.0])
 n_panel_body_for_calc_final = default_n_panel_body_for_calc
 if best_hypothesis_info:
     print(
         f"\n--- Найдена наилучшая гипотеза: {best_hypothesis_info['name']} (Оценка: {best_hypothesis_info['score']:.4f}) ---")
-    attitude_matrix = best_hypothesis_info['attitude'];
+    attitude_matrix = best_hypothesis_info['attitude']
     s_sun_body = best_hypothesis_info['s_sun_body']
     n_panel_body_for_calc_final = best_hypothesis_info['config']
 else:
     print("\nПРЕДУПРЕЖДЕНИЕ: Не найдена лучшая гипотеза. Используется конфигурация по умолчанию.")
     s_sun_body = solve_sun_vector_body(I_sb_current, I_max_panel,
-                                       n_panel_body_for_calc_final)
+                                       n_panel_body_for_calc_final)  # Используем старую solve_sun_vector_body
     try:
         attitude_matrix = calculate_attitude_triad(s_sun_body, nadir_body_assumed, s_sun_global, nadir_global)
     except ValueError as e:
@@ -370,9 +364,9 @@ else:
 print(f"\n--- Финальные параметры ориентации ---")
 print(f"Позиция КА в GCRS [км]: {sat_pos_gcrs_km}")
 print(f"Вектор на Солнце в глоб. СК (от КА): {s_sun_global}")
-print(f"Вектор на надир в глоб. СК (от КА): {nadir_global}")
+print(f"Вектор на надир в глоб. СК (от КА): {nadir_global}")  # Оставляем для информации
 print(f"Вектор на Солнце в СК КА: {s_sun_body}")
-print(f"Вектор на надир в СК КА (предположение): {nadir_body_assumed}")
+print(f"Вектор на надир в СК КА (предположение): {nadir_body_assumed}")  # Оставляем для информации
 print(f"Матрица ориентации (body-to-global):\n{attitude_matrix}")
 if not np.allclose(np.dot(attitude_matrix, attitude_matrix.T), np.identity(3)): print(
     "ПРЕДУПРЕЖДЕНИЕ: Матрица не ортонормирована!")
@@ -384,7 +378,7 @@ print(f"Ориентация (кватернион XYZW, body-to-global): {orien
 print(
     f"Ориентация (углы Эйлера 'xyz', body-to-global) [градусы]: Roll={orientation_euler_xyz_deg[0]:.2f}°, Pitch={orientation_euler_xyz_deg[1]:.2f}°, Yaw={orientation_euler_xyz_deg[2]:.2f}°")
 
-print("\n--- Углы к Солнцу и Надиру в СК КА ---")
+print("\n--- Углы к Солнцу и Надиру в СК КА ---")  # Надир здесь все еще по предположению
 if np.linalg.norm(s_sun_body) > 1e-6:
     az_sun_body = np.degrees(np.arctan2(s_sun_body[1], s_sun_body[0]))
     el_sun_body = np.degrees(np.arcsin(np.clip(s_sun_body[2], -1, 1)))
@@ -401,22 +395,22 @@ satellite_body_mesh_local = pv.Box(
             satellite_dimensions[1] / 2, -satellite_dimensions[2] / 2, satellite_dimensions[2] / 2, ])
 body_actor = plotter.add_mesh(satellite_body_mesh_local.copy(), color='red', edge_color='blue', show_edges=True,
                               line_width=3, specular=0.6, specular_power=10)
-rotation_transform = np.eye(4);
+rotation_transform = np.eye(4)
 rotation_transform[:3, :3] = attitude_matrix
 body_actor.user_matrix = rotation_transform
-axis_length = np.max(satellite_dimensions) * 1.5;
+axis_length = np.max(satellite_dimensions) * 1.5
 origin_body = np.array([0.0, 0.0, 0.0])
-x_axis_body = np.array([axis_length, 0, 0]);
-y_axis_body = np.array([0, axis_length, 0]);
+x_axis_body = np.array([axis_length, 0, 0])
+y_axis_body = np.array([0, axis_length, 0])
 z_axis_body = np.array([0, 0, axis_length])
-x_axis_global_vis = attitude_matrix @ x_axis_body;
-y_axis_global_vis = attitude_matrix @ y_axis_body;
+x_axis_global_vis = attitude_matrix @ x_axis_body
+y_axis_global_vis = attitude_matrix @ y_axis_body
 z_axis_global_vis = attitude_matrix @ z_axis_body
 plotter.add_arrows(cent=origin_body, direction=x_axis_global_vis, mag=1, color='darkred', line_width=3, label="X_КА")
 plotter.add_arrows(cent=origin_body, direction=y_axis_global_vis, mag=1, color='darkgreen', line_width=3, label="Y_КА")
 plotter.add_arrows(cent=origin_body, direction=z_axis_global_vis, mag=1, color='darkblue', line_width=3, label="Z_КА")
 if n_panel_body_for_calc_final:  # Отрисовка панелей
-    panel_thickness_ratio = 0.05;
+    panel_thickness_ratio = 0.05
     panel_offset_ratio = 0.01
     face_plane_axes_map = {(1, 0, 0): [1, 2], (-1, 0, 0): [1, 2], (0, 1, 0): [0, 2], (0, -1, 0): [0, 2],
                            (0, 0, 1): [0, 1], (0, 0, -1): [0, 1], }
@@ -428,7 +422,7 @@ if n_panel_body_for_calc_final:  # Отрисовка панелей
         thickness_axis_idx = np.where(np.abs(normal_vec_panel) > 0.5)[0][0]
         panel_dim_local = np.zeros(3)
         panel_dim_local[thickness_axis_idx] = satellite_dimensions[thickness_axis_idx] * panel_thickness_ratio
-        dim_idx1 = dims_axes_indices[0];
+        dim_idx1 = dims_axes_indices[0]
         dim_idx2 = dims_axes_indices[1]
         panel_dim_local[dim_idx1] = satellite_dimensions[dim_idx1] * 0.95
         panel_dim_local[dim_idx2] = satellite_dimensions[dim_idx2] * 0.95
@@ -454,10 +448,10 @@ plotter.add_legend(
     labels=[("X_КА", "darkred"), ("Y_КА", "darkgreen"), ("Z_КА", "darkblue"), ("Земля (символ)", "green"),
             ("Напр. к Земле (по оси КА)", "purple"), ("Напр. к Солнцу (по осям КА)", "yellow")], bcolor=None,
     face='none', border=True, size=(0.25, 0.22))
-plotter.camera.focal_point = [0, 0, 0];
+plotter.camera.focal_point = [0, 0, 0]
 cam_pos_factor = np.max(satellite_dimensions) * 15
 plotter.camera.position = [-cam_pos_factor * 0.8, -cam_pos_factor, cam_pos_factor * 0.5]
-plotter.camera.view_up = [0, 0, 1];
+plotter.camera.view_up = [0, 0, 1]
 plotter.camera.zoom(1.0)
 plotter.enable_anti_aliasing('fxaa')
 print("\nИнструкции для PyVista окна: (ЛКМ - вращение, колесико/ПКМ - зум, СКМ - панорама)")
